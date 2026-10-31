@@ -66,7 +66,41 @@ void main() {
     expect(find.text('Projector not working'), findsNothing);
   });
 
+  testWidgets('wizard back button allows returning to previous step', (tester) async {
+    await tester.pumpWidget(const CampusConnectApp(initialLoggedIn: true));
+
+    await tester.tap(find.byKey(const ValueKey('nav-report')));
+    await tester.pumpAndSettle();
+    expect(find.text('Report an Incident'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('category-Broken Facility')));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('incident-description')),
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('incident-description')),
+      'Testing wizard back navigation.',
+    );
+    await tester.tap(find.text('Next'));
+    await tester.pumpAndSettle();
+
+    // Verify back button is present on step 1
+    expect(find.byKey(const ValueKey('wizard-back')), findsOneWidget);
+
+    // Tap Back
+    await tester.tap(find.byKey(const ValueKey('wizard-back')));
+    await tester.pumpAndSettle();
+
+    // Verify we returned to step 0
+    expect(find.text('Incident Category'), findsOneWidget);
+  });
+
   testWidgets('authentication login and sign out flow works', (tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     await tester.pumpWidget(const CampusConnectApp(initialLoggedIn: false));
 
     // Verify auth screen is shown
