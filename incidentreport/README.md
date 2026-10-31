@@ -1,6 +1,6 @@
-# Campus Connect
+# CampusHub
 
-Campus Connect is a Flutter incident-reporting app designed for Android. The
+CampusHub is a Flutter incident-reporting app designed for Android. The
 interface follows the supplied mockup and includes a searchable incident feed,
 category and status filters, report details, and a four-step reporting flow.
 
