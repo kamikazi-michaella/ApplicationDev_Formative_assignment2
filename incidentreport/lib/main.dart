@@ -1099,10 +1099,10 @@ class _ReportWizardState extends State<_ReportWizard> {
     try {
       final path = await _photoChannel.invokeMethod<String>('pickImage');
       if (path != null && mounted) setState(() => _photoPath = path);
-    } on PlatformException {
-      if (mounted) _showMessage('Could not open your photo library.');
     } on MissingPluginException {
       if (mounted) _showMessage('Photo attachments are available on Android.');
+    } on PlatformException {
+      if (mounted) _showMessage('Could not open your photo library.');
     } finally {
       if (mounted) setState(() => _isPickingPhoto = false);
     }

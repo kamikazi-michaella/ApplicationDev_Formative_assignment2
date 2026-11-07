@@ -28,7 +28,15 @@ local.properties
 
 # Service accounts & debug logs
 service-account*.json
+*service-account*.json
+*service_account*.json
+credentials.json
+client_secret*.json
 firebase-debug.log
+
+# State files can contain provider credentials
+*.tfstate
+*.tfstate.*
 
 # ==========================================
 # IDEs & Local System Files
