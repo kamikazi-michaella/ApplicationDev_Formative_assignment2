@@ -17,7 +17,7 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
-            "campus_connect/photo_picker"
+            "campushub/photo_picker"
         ).setMethodCallHandler { call, result ->
             if (call.method != "pickImage") {
                 result.notImplemented()

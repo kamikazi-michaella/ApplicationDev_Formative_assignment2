@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 void main() {
-  runApp(const CampusConnectApp());
+  runApp(const CampusHubApp());
 }
 
 const _green = Color(0xFF10B981); // Primary (Green)
@@ -13,19 +13,25 @@ const _ink = Color(0xFF182842);
 const _muted = Color(0xFF687B98);
 const _canvas = Color(0xFFF4F7FB);
 const _line = Color(0xFFE0E8F2);
-const _photoChannel = MethodChannel('campus_connect/photo_picker');
+const _photoChannel = MethodChannel('campushub/photo_picker');
 
-class CampusConnectApp extends StatefulWidget {
-  const CampusConnectApp({super.key, this.initialLoggedIn = false});
+class CampusHubApp extends StatefulWidget {
+  const CampusHubApp({
+    super.key,
+    this.initialLoggedIn = false,
+    this.initialIsAdmin = false,
+  });
 
   final bool initialLoggedIn;
+  final bool initialIsAdmin;
 
   @override
-  State<CampusConnectApp> createState() => _CampusConnectAppState();
+  State<CampusHubApp> createState() => _CampusHubAppState();
 }
 
-class _CampusConnectAppState extends State<CampusConnectApp> {
+class _CampusHubAppState extends State<CampusHubApp> {
   late bool _isLoggedIn;
+  late bool _isAdmin;
   String _userName = 'Campus community member';
   String _userEmail = 'student@campus.edu';
 
@@ -33,11 +39,17 @@ class _CampusConnectAppState extends State<CampusConnectApp> {
   void initState() {
     super.initState();
     _isLoggedIn = widget.initialLoggedIn;
+    _isAdmin = widget.initialIsAdmin;
+    if (_isAdmin) {
+      _userName = 'System Administrator';
+      _userEmail = 'admin@campus.edu';
+    }
   }
 
-  void _login(String name, String email) {
+  void _login(String name, String email, {bool isAdmin = false}) {
     setState(() {
       _isLoggedIn = true;
+      _isAdmin = isAdmin || (email.trim().toLowerCase() == 'admin' && name.toLowerCase() == 'admin');
       if (name.isNotEmpty) _userName = name;
       if (email.isNotEmpty) _userEmail = email;
     });
@@ -46,13 +58,14 @@ class _CampusConnectAppState extends State<CampusConnectApp> {
   void _logout() {
     setState(() {
       _isLoggedIn = false;
+      _isAdmin = false;
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Campus Connect',
+      title: 'CampusHub',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -103,6 +116,7 @@ class _CampusConnectAppState extends State<CampusConnectApp> {
           ? CampusHomePage(
               userName: _userName,
               userEmail: _userEmail,
+              isAdmin: _isAdmin,
               onLogout: _logout,
             )
           : AuthScreen(onLogin: _login),
@@ -151,6 +165,28 @@ class Incident {
   final DateTime date;
   final String status;
   final String? photoPath;
+
+  Incident copyWith({
+    String? id,
+    String? title,
+    String? category,
+    String? description,
+    String? location,
+    DateTime? date,
+    String? status,
+    String? photoPath,
+  }) {
+    return Incident(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      category: category ?? this.category,
+      description: description ?? this.description,
+      location: location ?? this.location,
+      date: date ?? this.date,
+      status: status ?? this.status,
+      photoPath: photoPath ?? this.photoPath,
+    );
+  }
 }
 
 List<Incident> _sampleIncidents() => [
@@ -206,11 +242,13 @@ class CampusHomePage extends StatefulWidget {
     super.key,
     required this.userName,
     required this.userEmail,
+    this.isAdmin = false,
     required this.onLogout,
   });
 
   final String userName;
   final String userEmail;
+  final bool isAdmin;
   final VoidCallback onLogout;
 
   @override
@@ -243,15 +281,47 @@ class _CampusHomePageState extends State<CampusHomePage> {
     );
   }
 
+  void _deleteIncident(Incident incident) {
+    setState(() {
+      _incidents.removeWhere((item) => item.id == incident.id);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Incident ${incident.id} has been deleted by Admin.'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _updateIncidentStatus(Incident incident, String newStatus) {
+    setState(() {
+      final index = _incidents.indexWhere((item) => item.id == incident.id);
+      if (index != -1) {
+        _incidents[index] = _incidents[index].copyWith(status: newStatus);
+      }
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Incident ${incident.id} status updated to "$newStatus" by Admin.',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
       _IncidentDashboard(
         incidents: _incidents,
         showAll: _showAllIncidents,
+        isAdmin: widget.isAdmin,
         onShowAll: () => _openIncidents(showAll: true),
         onShowMine: () => setState(() => _showAllIncidents = false),
         onReport: () => setState(() => _selectedTab = 1),
+        onDeleteIncident: _deleteIncident,
+        onUpdateIncidentStatus: _updateIncidentStatus,
       ),
       _ReportWizard(
         key: ValueKey('report-$_selectedTab-${_incidents.length}'),
@@ -261,16 +331,20 @@ class _CampusHomePageState extends State<CampusHomePage> {
       _IncidentDashboard(
         incidents: _incidents,
         showAll: true,
+        isAdmin: widget.isAdmin,
         onShowAll: () => _openIncidents(showAll: true),
         onShowMine: () => setState(() {
           _selectedTab = 0;
           _showAllIncidents = false;
         }),
         onReport: () => setState(() => _selectedTab = 1),
+        onDeleteIncident: _deleteIncident,
+        onUpdateIncidentStatus: _updateIncidentStatus,
       ),
       _ProfilePage(
         userName: widget.userName,
         userEmail: widget.userEmail,
+        isAdmin: widget.isAdmin,
         onLogout: widget.onLogout,
       ),
     ];
@@ -320,16 +394,23 @@ class _IncidentDashboard extends StatefulWidget {
   const _IncidentDashboard({
     required this.incidents,
     required this.showAll,
+    this.isAdmin = false,
     required this.onShowAll,
     required this.onShowMine,
     required this.onReport,
+    this.onDeleteIncident,
+    this.onUpdateIncidentStatus,
   });
 
   final List<Incident> incidents;
   final bool showAll;
+  final bool isAdmin;
   final VoidCallback onShowAll;
   final VoidCallback onShowMine;
   final VoidCallback onReport;
+  final void Function(Incident incident)? onDeleteIncident;
+  final void Function(Incident incident, String newStatus)?
+      onUpdateIncidentStatus;
 
   @override
   State<_IncidentDashboard> createState() => _IncidentDashboardState();
@@ -455,8 +536,30 @@ class _IncidentDashboardState extends State<_IncidentDashboard> {
                     itemCount: incidents.length,
                     itemBuilder: (context, index) => _IncidentCard(
                       incident: incidents[index],
-                      onTap: () =>
-                          _showIncidentDetails(context, incidents[index]),
+                      isAdmin: widget.isAdmin,
+                      onDelete: widget.onDeleteIncident == null
+                          ? null
+                          : () => widget.onDeleteIncident!(incidents[index]),
+                      onUpdateStatus: widget.onUpdateIncidentStatus == null
+                          ? null
+                          : (newStatus) => widget.onUpdateIncidentStatus!(
+                                incidents[index],
+                                newStatus,
+                              ),
+                      onTap: () => _showIncidentDetails(
+                        context,
+                        incidents[index],
+                        isAdmin: widget.isAdmin,
+                        onDelete: widget.onDeleteIncident == null
+                            ? null
+                            : () => widget.onDeleteIncident!(incidents[index]),
+                        onUpdateStatus: widget.onUpdateIncidentStatus == null
+                            ? null
+                            : (newStatus) => widget.onUpdateIncidentStatus!(
+                                  incidents[index],
+                                  newStatus,
+                                ),
+                      ),
                     ),
                     separatorBuilder: (_, _) => const SizedBox(height: 8),
                   ),
@@ -509,7 +612,7 @@ class _BrandHeader extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Campus Connect',
+                      'CampusHub',
                       style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w800,
@@ -685,10 +788,19 @@ class _FilterDropdown extends StatelessWidget {
 }
 
 class _IncidentCard extends StatelessWidget {
-  const _IncidentCard({required this.incident, required this.onTap});
+  const _IncidentCard({
+    required this.incident,
+    required this.onTap,
+    this.isAdmin = false,
+    this.onDelete,
+    this.onUpdateStatus,
+  });
 
   final Incident incident;
   final VoidCallback onTap;
+  final bool isAdmin;
+  final VoidCallback? onDelete;
+  final void Function(String newStatus)? onUpdateStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -766,7 +878,84 @@ class _IncidentCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 3),
-              const Icon(Icons.chevron_right_rounded, color: _muted, size: 21),
+              if (isAdmin)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (onUpdateStatus != null)
+                      PopupMenuButton<String>(
+                        key: ValueKey('change-status-${incident.id}'),
+                        icon: const Icon(
+                          Icons.published_with_changes_rounded,
+                          color: _blue,
+                          size: 21,
+                        ),
+                        tooltip: 'Change Status',
+                        onSelected: (newStatus) {
+                          if (newStatus != incident.status) {
+                            onUpdateStatus!(newStatus);
+                          }
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem(
+                            value: 'Pending',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.hourglass_empty_rounded,
+                                  color: Color(0xFFE98908),
+                                  size: 18,
+                                ),
+                                SizedBox(width: 8),
+                                Text('Pending'),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'In Progress',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.build_circle_outlined,
+                                  color: Color(0xFF1766C1),
+                                  size: 18,
+                                ),
+                                SizedBox(width: 8),
+                                Text('In Progress'),
+                              ],
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'Resolved',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.check_circle_outline_rounded,
+                                  color: Color(0xFF178B55),
+                                  size: 18,
+                                ),
+                                SizedBox(width: 8),
+                                Text('Resolved'),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    if (onDelete != null)
+                      IconButton(
+                        key: ValueKey('delete-incident-${incident.id}'),
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          color: Colors.redAccent,
+                          size: 21,
+                        ),
+                        tooltip: 'Delete Incident',
+                        onPressed: onDelete,
+                      ),
+                  ],
+                )
+              else
+                const Icon(Icons.chevron_right_rounded, color: _muted, size: 21),
             ],
           ),
         ),
@@ -1354,6 +1543,7 @@ class _WizardHeader extends StatelessWidget {
               child: Row(
                 children: [
                   IconButton(
+                    key: const ValueKey('wizard-back'),
                     onPressed: onBack,
                     tooltip: 'Go back',
                     icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -1480,11 +1670,13 @@ class _ProfilePage extends StatelessWidget {
   const _ProfilePage({
     required this.userName,
     required this.userEmail,
+    this.isAdmin = false,
     required this.onLogout,
   });
 
   final String userName;
   final String userEmail;
+  final bool isAdmin;
   final VoidCallback onLogout;
 
   @override
@@ -1505,10 +1697,14 @@ class _ProfilePage extends StatelessWidget {
             bottom: false,
             child: Column(
               children: [
-                const CircleAvatar(
+                CircleAvatar(
                   radius: 35,
                   backgroundColor: Colors.white,
-                  child: Icon(Icons.person, color: _green, size: 38),
+                  child: Icon(
+                    isAdmin ? Icons.admin_panel_settings_rounded : Icons.person,
+                    color: isAdmin ? _blue : _green,
+                    size: 38,
+                  ),
                 ),
                 const SizedBox(height: 10),
                 Text(
@@ -1527,6 +1723,25 @@ class _ProfilePage extends StatelessWidget {
                     fontSize: 12,
                   ),
                 ),
+                if (isAdmin) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.shade400,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text(
+                      'ADMINISTRATOR',
+                      style: TextStyle(
+                        color: _ink,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 14),
                 OutlinedButton.icon(
                   key: const ValueKey('profile-logout'),
@@ -1548,23 +1763,38 @@ class _ProfilePage extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.all(18),
           child: Column(
-            children: const [
-              _ProfileRow(
+            children: [
+              if (isAdmin) ...[
+                const _ProfileRow(
+                  icon: Icons.admin_panel_settings_rounded,
+                  title: 'Administrator Privileges',
+                  subtitle:
+                      'Full backend access. Change status and delete user-reported incidents',
+                ),
+                const SizedBox(height: 10),
+                const _ProfileRow(
+                  icon: Icons.key_rounded,
+                  title: 'Local Admin Account',
+                  subtitle: 'Credentials: admin / admin',
+                ),
+                const SizedBox(height: 10),
+              ],
+              const _ProfileRow(
                 icon: Icons.shield_outlined,
-                title: 'About Campus Connect',
+                title: 'About CampusHub',
                 subtitle: 'Report, track and improve campus facilities',
               ),
-              SizedBox(height: 10),
-              _ProfileRow(
+              const SizedBox(height: 10),
+              const _ProfileRow(
                 icon: Icons.lock_outline_rounded,
                 title: 'Your privacy',
                 subtitle: 'Only share details relevant to resolving an issue',
               ),
-              SizedBox(height: 10),
-              _ProfileRow(
+              const SizedBox(height: 10),
+              const _ProfileRow(
                 icon: Icons.info_outline_rounded,
                 title: 'App information',
-                subtitle: 'Campus Connect · Version 1.0',
+                subtitle: 'CampusHub · Version 1.0',
               ),
             ],
           ),
@@ -1623,7 +1853,13 @@ class _ProfileRow extends StatelessWidget {
   }
 }
 
-void _showIncidentDetails(BuildContext context, Incident incident) {
+void _showIncidentDetails(
+  BuildContext context,
+  Incident incident, {
+  bool isAdmin = false,
+  VoidCallback? onDelete,
+  void Function(String newStatus)? onUpdateStatus,
+}) {
   final category = _categoryFor(incident.category);
   showModalBottomSheet<void>(
     context: context,
@@ -1708,6 +1944,117 @@ void _showIncidentDetails(BuildContext context, Incident incident) {
                 ),
               ),
             ],
+            if (isAdmin) ...[
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: _line),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(
+                          Icons.admin_panel_settings_rounded,
+                          color: _blue,
+                          size: 20,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Admin Controls',
+                          style: TextStyle(
+                            color: _ink,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (onUpdateStatus != null) ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Change Incident Status:',
+                        style: TextStyle(
+                          color: _muted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: ['Pending', 'In Progress', 'Resolved'].map((
+                          statusOption,
+                        ) {
+                          final isCurrent = incident.status == statusOption;
+                          final color = switch (statusOption) {
+                            'Resolved' => const Color(0xFF178B55),
+                            'Pending' => const Color(0xFFE98908),
+                            _ => const Color(0xFF1766C1),
+                          };
+                          return ChoiceChip(
+                            key: ValueKey(
+                              'status-chip-$statusOption-${incident.id}',
+                            ),
+                            label: Text(
+                              statusOption,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: isCurrent
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                                color: isCurrent ? Colors.white : color,
+                              ),
+                            ),
+                            selected: isCurrent,
+                            selectedColor: color,
+                            backgroundColor: color.withValues(alpha: 0.1),
+                            showCheckmark: false,
+                            onSelected: (selected) {
+                              if (selected && statusOption != incident.status) {
+                                Navigator.pop(context);
+                                onUpdateStatus(statusOption);
+                              }
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                    if (onDelete != null) ...[
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          key: ValueKey('delete-incident-modal-${incident.id}'),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            onDelete();
+                          },
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.red.shade700,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          icon: const Icon(Icons.delete_forever_rounded),
+                          label: const Text(
+                            'Delete Reported Incident',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -1749,7 +2096,7 @@ String _formatTime(DateTime date) {
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key, required this.onLogin});
 
-  final void Function(String name, String email) onLogin;
+  final void Function(String name, String email, {bool isAdmin}) onLogin;
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -1776,17 +2123,22 @@ class _AuthScreenState extends State<AuthScreen> {
 
   void _submit() {
     if (_formKey.currentState?.validate() ?? false) {
-      final name = _isRegistering ? _nameController.text.trim() : 'Campus community member';
-      final email = _emailController.text.trim();
+      final inputUserOrEmail = _emailController.text.trim();
+      final password = _passwordController.text.trim();
+      final isAdmin = (inputUserOrEmail.toLowerCase() == 'admin' && password == 'admin');
+
+      final defaultName = isAdmin ? 'System Administrator' : 'Campus community member';
+      final defaultEmail = isAdmin ? 'admin@campus.edu' : 'student@campus.edu';
+
+      final name = _isRegistering ? _nameController.text.trim() : defaultName;
+      final email = inputUserOrEmail.isEmpty ? defaultEmail : inputUserOrEmail;
+
       widget.onLogin(
-        name.isEmpty ? 'Campus community member' : name,
-        email.isEmpty ? 'student@campus.edu' : email,
+        name.isEmpty ? defaultName : name,
+        email,
+        isAdmin: isAdmin,
       );
     }
-  }
-
-  void _quickDemoLogin() {
-    widget.onLogin('Alex Student', 'alex.student@campus.edu');
   }
 
   @override
@@ -1832,7 +2184,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     ),
                     const SizedBox(height: 20),
                     const Text(
-                      'Campus Connect',
+                      'CampusHub',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: _ink,
@@ -1951,7 +2303,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             const SizedBox(height: 16),
                           ],
                           const Text(
-                            'Email or Student ID',
+                            'Email or Username',
                             style: TextStyle(
                               color: _ink,
                               fontSize: 13,
@@ -1964,7 +2316,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             key: const ValueKey('auth-email'),
                             keyboardType: TextInputType.emailAddress,
                             decoration: const InputDecoration(
-                              hintText: 'e.g. student@campus.edu',
+                              hintText: 'e.g. admin or student@campus.edu',
                               prefixIcon: Icon(
                                 Icons.email_outlined,
                                 color: _muted,
@@ -1972,7 +2324,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             ),
                             validator: (v) {
                               if (v == null || v.trim().isEmpty) {
-                                return 'Please enter your email or student ID';
+                                return 'Please enter your email or username';
                               }
                               return null;
                             },
@@ -2010,7 +2362,10 @@ class _AuthScreenState extends State<AuthScreen> {
                               ),
                             ),
                             validator: (v) {
-                              if (v == null || v.length < 6) {
+                              if (v == null || v.trim().isEmpty) {
+                                return 'Please enter your password';
+                              }
+                              if (v.trim() != 'admin' && v.length < 6) {
                                 return 'Password must be at least 6 characters';
                               }
                               return null;
@@ -2069,30 +2424,6 @@ class _AuthScreenState extends State<AuthScreen> {
                             ),
                           ),
                         ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    OutlinedButton.icon(
-                      key: const ValueKey('auth-demo-login'),
-                      onPressed: _quickDemoLogin,
-                      icon: const Icon(
-                        Icons.flash_on_rounded,
-                        color: _blue,
-                        size: 18,
-                      ),
-                      label: const Text(
-                        'Quick Demo Sign In',
-                        style: TextStyle(
-                          color: _blue,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        side: const BorderSide(color: _blue),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(13),
-                        ),
                       ),
                     ),
                   ],

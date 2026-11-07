@@ -1,48 +1,86 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
+# ==========================================
+# Sensitive Credentials & Private Secrets
+# ==========================================
+# Firebase configuration & API keys
+google-services.json
+**/android/app/google-services.json
+GoogleService-Info.plist
+**/ios/Runner/GoogleService-Info.plist
+lib/firebase_options.dart
 
-# IntelliJ related
+# Keystore & App Signing keys/certificates
+*.keystore
+*.jks
+*.p12
+*.pem
+*.crt
+*.key
+*.pk8
+key.properties
+**/android/key.properties
+
+# Local environment & SDK settings
+.env
+.env.*
+*.env
+local.properties
+**/android/local.properties
+
+# Service accounts & debug logs
+service-account*.json
+firebase-debug.log
+
+# ==========================================
+# IDEs & Local System Files
+# ==========================================
+.idea/
 *.iml
 *.ipr
 *.iws
-.idea/
+.vscode/
+*.swp
+*.bak
+*~
+.DS_Store
+Thumbs.db
+ehthumbs.db
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
+# ==========================================
+# Flutter / Dart Build & Dependencies
+# ==========================================
 .dart_tool/
+.flutter-plugins
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
 /build/
 /coverage/
+**/doc/api/
+.widget_preview/
 
-# Symbolication related
-app.*.symbols
-
-# Obfuscation related
-app.*.map.json
-
-# Android Studio will place build artifacts here
+# Native ephemeral & build directories
+/android/.gradle/
 /android/app/debug
 /android/app/profile
 /android/app/release
+/ios/Flutter/.last_build_id
+/ios/Flutter/ephemeral/
+/ios/Pods/
+/ios/.symlinks/
+/macos/Flutter/ephemeral/
+/windows/flutter/ephemeral/
+/linux/flutter/ephemeral/
 
-# Widget Preview related
-.widget_preview/
+# Binaries & Compiled Artifacts
+*.apk
+*.aab
+*.ipa
+*.app
+*.class
+*.exe
+*.dll
+*.so
+*.dylib
+app.*.symbols
+app.*.map.json
+*.log

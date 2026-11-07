@@ -3,17 +3,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:incidentreport/main.dart';
 
 void main() {
-  testWidgets('shows the Campus Connect incident feed', (tester) async {
-    await tester.pumpWidget(const CampusConnectApp(initialLoggedIn: true));
+  testWidgets('shows the CampusHub incident feed', (tester) async {
+    await tester.pumpWidget(const CampusHubApp(initialLoggedIn: true));
 
-    expect(find.text('Campus Connect'), findsOneWidget);
+    expect(find.text('CampusHub'), findsOneWidget);
     expect(find.text('My Incidents'), findsOneWidget);
     expect(find.text('Projector not working'), findsOneWidget);
     expect(find.text('In Progress'), findsOneWidget);
   });
 
   testWidgets('submits a report through all four steps', (tester) async {
-    await tester.pumpWidget(const CampusConnectApp(initialLoggedIn: true));
+    await tester.pumpWidget(const CampusHubApp(initialLoggedIn: true));
 
     await tester.tap(find.byKey(const ValueKey('nav-report')));
     await tester.pumpAndSettle();
@@ -54,7 +54,7 @@ void main() {
   });
 
   testWidgets('search filters the incident feed', (tester) async {
-    await tester.pumpWidget(const CampusConnectApp(initialLoggedIn: true));
+    await tester.pumpWidget(const CampusHubApp(initialLoggedIn: true));
 
     await tester.enterText(
       find.byKey(const ValueKey('incident-search')),
@@ -67,7 +67,7 @@ void main() {
   });
 
   testWidgets('wizard back button allows returning to previous step', (tester) async {
-    await tester.pumpWidget(const CampusConnectApp(initialLoggedIn: true));
+    await tester.pumpWidget(const CampusHubApp(initialLoggedIn: true));
 
     await tester.tap(find.byKey(const ValueKey('nav-report')));
     await tester.pumpAndSettle();
@@ -101,26 +101,27 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(const CampusConnectApp(initialLoggedIn: false));
+    await tester.pumpWidget(const CampusHubApp(initialLoggedIn: false));
 
     // Verify auth screen is shown
     expect(find.text('Sign in to access your campus incident reports'), findsOneWidget);
-    expect(find.byKey(const ValueKey('auth-demo-login')), findsOneWidget);
+    expect(find.byKey(const ValueKey('auth-email')), findsOneWidget);
 
-    // Ensure demo login button is visible and tap it
-    await tester.ensureVisible(find.byKey(const ValueKey('auth-demo-login')));
-    await tester.tap(find.byKey(const ValueKey('auth-demo-login')));
+    await tester.enterText(find.byKey(const ValueKey('auth-email')), 'student@campus.edu');
+    await tester.enterText(find.byKey(const ValueKey('auth-password')), 'password123');
+    await tester.ensureVisible(find.byKey(const ValueKey('auth-submit')));
+    await tester.tap(find.byKey(const ValueKey('auth-submit')));
     await tester.pumpAndSettle();
 
     // Verify we reached the dashboard
-    expect(find.text('Campus Connect'), findsOneWidget);
+    expect(find.text('CampusHub'), findsOneWidget);
 
     // Navigate to profile tab (4th tab)
     await tester.tap(find.byKey(const ValueKey('nav-profile')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Alex Student'), findsOneWidget);
-    expect(find.text('alex.student@campus.edu'), findsOneWidget);
+    expect(find.text('Campus community member'), findsOneWidget);
+    expect(find.text('student@campus.edu'), findsOneWidget);
 
     // Sign out
     await tester.tap(find.byKey(const ValueKey('profile-logout')));
@@ -128,5 +129,61 @@ void main() {
 
     // Verify we are back to the auth screen
     expect(find.text('Sign in to access your campus incident reports'), findsOneWidget);
+  });
+
+  testWidgets('admin login with admin/admin credentials grants delete privileges', (tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const CampusHubApp(initialLoggedIn: false));
+
+    await tester.enterText(find.byKey(const ValueKey('auth-email')), 'admin');
+    await tester.enterText(find.byKey(const ValueKey('auth-password')), 'admin');
+    await tester.ensureVisible(find.byKey(const ValueKey('auth-submit')));
+    await tester.tap(find.byKey(const ValueKey('auth-submit')));
+    await tester.pumpAndSettle();
+
+    // Verify logged in as admin
+    expect(find.text('CampusHub'), findsOneWidget);
+    expect(find.text('Projector not working'), findsOneWidget);
+
+    // Delete incident CC-1048
+    final deleteKey = find.byKey(const ValueKey('delete-incident-CC-1048'));
+    expect(deleteKey, findsOneWidget);
+    await tester.tap(deleteKey);
+    await tester.pumpAndSettle();
+
+    // Verify deleted
+    expect(find.text('Projector not working'), findsNothing);
+  });
+
+  testWidgets('admin can change status of an incident', (tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const CampusHubApp(initialLoggedIn: false));
+
+    await tester.enterText(find.byKey(const ValueKey('auth-email')), 'admin');
+    await tester.enterText(find.byKey(const ValueKey('auth-password')), 'admin');
+    await tester.ensureVisible(find.byKey(const ValueKey('auth-submit')));
+    await tester.tap(find.byKey(const ValueKey('auth-submit')));
+    await tester.pumpAndSettle();
+
+    // Open change status popup for CC-1048
+    final statusMenuKey = find.byKey(const ValueKey('change-status-CC-1048'));
+    expect(statusMenuKey, findsOneWidget);
+    await tester.tap(statusMenuKey);
+    await tester.pumpAndSettle();
+
+    // Tap 'Resolved'
+    await tester.tap(find.text('Resolved').last);
+    await tester.pumpAndSettle();
+
+    // Verify status updated snackbar / text
+    expect(find.text('Incident CC-1048 status updated to "Resolved" by Admin.'), findsOneWidget);
   });
 }
